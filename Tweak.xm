@@ -1,5 +1,9 @@
 #import <UIKit/UIKit.h>
 
+// ---------------------------------------------------------------------
+// Log file: /var/mobile/Documents/ - mo truc tiep bang Filza, khong can
+// biet duong dan jbroot.
+// ---------------------------------------------------------------------
 static NSString *const kLogPath = @"/var/mobile/Documents/LiquidMorph.log";
 
 static void LMLog(NSString *format, ...) {
@@ -10,8 +14,7 @@ static void LMLog(NSString *format, ...) {
 
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss.SSS";
-    NSString *timestamp = [formatter stringFromDate:[NSDate date]];
-    NSString *line = [NSString stringWithFormat:@"[%@] %@\n", timestamp, message];
+    NSString *line = [NSString stringWithFormat:@"[%@] %@\n", [formatter stringFromDate:[NSDate date]], message];
 
     @try {
         NSFileManager *fm = [NSFileManager defaultManager];
@@ -31,27 +34,31 @@ static void LMLog(NSString *format, ...) {
     NSLog(@"[LiquidMorph] %@", message);
 }
 
-@interface SBIconView : UIView
-@end
-
-%hook SBIconView
-
-- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
-    @try {
-        id icon = [self valueForKey:@"icon"];
-        NSString *name = @"unknown";
-        if (icon && [icon respondsToSelector:@selector(displayName)]) {
-            name = [icon performSelector:@selector(displayName)] ?: @"unknown";
-        }
-        LMLog(@"Icon tapped: %@", name);
-    } @catch (NSException *e) {
-        LMLog(@"Exception in touchesEnded hook: %@", e.reason);
-    }
-    %orig;
-}
-
-%end
-
 %ctor {
-    LMLog(@"LiquidMorph loaded into process: %@", [[NSProcessInfo processInfo] processName]);
+    LMLog(@"=== LiquidMorph loaded into process: %@ | iOS %@ ===",
+          [[NSProcessInfo processInfo] processName],
+          [[UIDevice currentDevice] systemVersion]);
+
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+
+    // Dang ky nhieu ten notification khac nhau cung luc de do xem
+    // ten nao thuc su ban ra tren ban iOS ban dang chay.
+    NSArray *names = @[
+        @"SBApplicationDidLaunchNotification",
+        @"SBApplicationDidTerminateNotification",
+        @"FBApplicationProcessStateDidChangeNotification",
+        @"SBAppSwitcherDidLaunchApplicationNotification",
+        @"SBSuspendUserForegroundApplicationsNotification",
+        @"FBSceneDidActivateNotification",
+        @"FBSceneDidDeactivateNotification"
+    ];
+
+    for (NSString *name in names) {
+        [center addObserverForName:name
+                             object:nil
+                              queue:nil
+                         usingBlock:^(NSNotification *note) {
+            LMLog(@"Notification fired: %@ | object: %@", name, note.object);
+        }];
+    }
 }
