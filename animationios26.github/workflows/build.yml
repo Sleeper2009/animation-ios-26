@@ -1,0 +1,52 @@
+name: Build LiquidMorph
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot rsync curl git perl
+
+      - name: Install Theos
+        run: |
+          export THEOS=/opt/theos
+          sudo git clone --recursive https://github.com/theos/theos.git $THEOS
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+
+      - name: Install iOS SDK
+        run: |
+          git clone -n --depth=1 --filter=tree:0 https://github.com/theos/sdks.git
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
+          git checkout
+          sudo mv iPhoneOS16.5.sdk $THEOS/sdks/
+
+      - name: Install L1ghtmann toolchain
+        run: |
+          curl -LO https://github.com/L1ghtmann/llvm-project/releases/latest/download/ios-arm64-clang-llvm.tar.zst
+          sudo mkdir -p $THEOS/toolchain/linux/iphone
+          sudo tar -I zstd -xf ios-arm64-clang-llvm.tar.zst -C $THEOS/toolchain/linux/iphone --strip-components=1
+
+      - name: Build package
+        env:
+          THEOS: /opt/theos
+          THEOS_PACKAGE_SCHEME: rootless
+        run: |
+          export PATH=$THEOS/toolchain/linux/iphone/bin:$PATH
+          make package FINALPACKAGE=1
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiquidMorph-deb
+          path: packages/*.deb
