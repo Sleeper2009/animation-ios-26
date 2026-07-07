@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 
 static NSString *const kLogPath = @"/var/mobile/Documents/LiquidMorph.log";
 
@@ -26,32 +27,43 @@ static void LMLog(NSString *format, ...) {
     } @catch (NSException *e) {
         NSLog(@"[LiquidMorph] Log write failed: %@", e.reason);
     }
-
     NSLog(@"[LiquidMorph] %@", message);
 }
 
-@interface SBIconView : UIView
-@end
-
-@interface SBIconController : NSObject
-- (BOOL)iconShouldAllowTap:(SBIconView *)iconView;
-@end
-
-%hook SBIconController
-
-- (BOOL)iconShouldAllowTap:(SBIconView *)iconView {
-    @try {
-        LMLog(@"iconShouldAllowTap fired | iconView class: %@", NSStringFromClass([iconView class]));
-    } @catch (NSException *e) {
-        LMLog(@"Exception in iconShouldAllowTap: %@", e.reason);
+// Liet ke toan bo method cua 1 class, chi ghi ra nhung ten co chua tu khoa
+// can tim (vd "tap", "launch", "invoke") de khong bi qua dai.
+static void LMDumpMethods(NSString *className, NSString *keyword) {
+    Class cls = NSClassFromString(className);
+    if (!cls) {
+        LMLog(@"[dump] Class not found: %@", className);
+        return;
     }
-    return %orig;
+    unsigned int count = 0;
+    Method *methods = class_copyMethodList(cls, &count);
+    LMLog(@"[dump] ---- %@ (%u methods) chua '%@' ----", className, count, keyword);
+    for (unsigned int i = 0; i < count; i++) {
+        SEL sel = method_getName(methods[i]);
+        NSString *name = NSStringFromSelector(sel);
+        if ([name.lowercaseString containsString:keyword.lowercaseString]) {
+            LMLog(@"[dump] %@ -> %@", className, name);
+        }
+    }
+    free(methods);
 }
 
-%end
-
 %ctor {
-    LMLog(@"=== LiquidMorph loaded into process: %@ | iOS %@ ===",
+    LMLog(@"=== LiquidMorph loaded | process: %@ | iOS %@ ===",
           [[NSProcessInfo processInfo] processName],
           [[UIDevice currentDevice] systemVersion]);
+
+    NSArray *classesToScan = @[@"SBIconController", @"SBIconView", @"SBIconViewMap", @"SBHomeScreenView"];
+    NSArray *keywords = @[@"tap", @"launch", @"invoke", @"activat"];
+
+    for (NSString *cls in classesToScan) {
+        for (NSString *kw in keywords) {
+            LMDumpMethods(cls, kw);
+        }
+    }
+
+    LMLog(@"=== Dump xong ===");
 }
