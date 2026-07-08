@@ -26,7 +26,6 @@ static void LMLog(NSString *format, ...) {
     NSLog(@"[LiquidMorph] %@", message);
 }
 
-// Ve 1 "hinh thang bo goc doc lap tung dinh" - moi goc co ban kinh rieng.
 static CGPathRef LMRoundedQuadPath(CGPoint tl, CGPoint tr, CGPoint br, CGPoint bl,
                                     CGFloat rTL, CGFloat rTR, CGFloat rBR, CGFloat rBL) {
     NSArray *points = @[[NSValue valueWithCGPoint:tl], [NSValue valueWithCGPoint:tr],
@@ -86,6 +85,16 @@ static void LMPlayMorphOverlay(CGRect iconFrame) {
         gOverlayWindow.windowLevel = UIWindowLevelStatusBar + 1000;
         gOverlayWindow.userInteractionEnabled = NO;
         gOverlayWindow.backgroundColor = [UIColor clearColor];
+
+        if (@available(iOS 13.0, *)) {
+            for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+                if ([scene isKindOfClass:[UIWindowScene class]]) {
+                    gOverlayWindow.windowScene = (UIWindowScene *)scene;
+                    break;
+                }
+            }
+        }
+
         gOverlayWindow.hidden = NO;
     }
 
