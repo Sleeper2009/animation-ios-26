@@ -67,8 +67,6 @@ static CGFloat LMEdgeProgress(CGFloat t, CGFloat closeness, CGFloat maxDelay) {
     return edgeT;
 }
 
-// Bo goc hinh "phong": bat dau nhu icon that (~13), phong len cao nhat (120)
-// giua chung, roi ha xuong 20 luc gan cuoi. KHONG con la duong giam thang.
 static CGFloat LMHumpRadius(CGFloat t) {
     CGFloat iconRadius = 13.0;
     CGFloat peakRadius = 120.0;
@@ -101,7 +99,16 @@ static UIImage *LMLoadAppSnapshot(NSString *bundleID) {
     return nil;
 }
 
+// Mau nen he thong (tu dong theo Sang/Toi), dung khi chua co snapshot that.
+static UIColor *LMSystemBackgroundColor(void) {
+    if (@available(iOS 13.0, *)) {
+        return [UIColor systemBackgroundColor];
+    }
+    return [UIColor whiteColor];
+}
+
 @interface LMTransitionState : NSObject
+@property (nonatomic, strong) CALayer *backdrop;   // lop nen dac, che kin toan man hinh
 @property (nonatomic, strong) CAShapeLayer *maskShape;
 @property (nonatomic, strong) CALayer *contentLayer;
 @property (nonatomic, assign) CGRect iconFrame;
@@ -179,6 +186,7 @@ static NSArray *LMBuildKeyframePaths(CGRect iconFrame, CGRect screen, BOOL openi
 
 static void LMCancelCurrentIfAny(void) {
     if (gCurrentState) {
+        [gCurrentState.backdrop removeFromSuperlayer];
         [gCurrentState.maskShape removeAllAnimations];
         [gCurrentState.contentLayer removeAllAnimations];
         [gCurrentState.maskShape removeFromSuperlayer];
@@ -209,6 +217,14 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
     LMEnsureWindow();
 
     CGRect screen = gOverlayWindow.bounds;
+
+    // Lop nen DAC, phu KIN toan man hinh NGAY LAP TUC - che hoan toan bat ky
+    // animation goc nao dang chay ben duoi, du no nhanh hay cham.
+    CALayer *backdrop = [CALayer layer];
+    backdrop.frame = screen;
+    backdrop.backgroundColor = LMSystemBackgroundColor().CGColor;
+    [gOverlayWindow.layer addSublayer:backdrop];
+
     UIImage *snapshot = LMLoadAppSnapshot(bundleID);
 
     CALayer *contentLayer = [CALayer layer];
@@ -217,7 +233,7 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
     if (snapshot) {
         contentLayer.contents = (__bridge id)snapshot.CGImage;
     } else {
-        contentLayer.backgroundColor = [UIColor colorWithWhite:0.98 alpha:1.0].CGColor;
+        contentLayer.backgroundColor = LMSystemBackgroundColor().CGColor;
     }
 
     CAShapeLayer *maskShape = [CAShapeLayer layer];
@@ -238,6 +254,7 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
     [maskShape addAnimation:anim forKey:@"morph"];
 
     LMTransitionState *state = [LMTransitionState new];
+    state.backdrop = backdrop;
     state.maskShape = maskShape;
     state.contentLayer = contentLayer;
     state.iconFrame = iconFrame;
@@ -248,8 +265,9 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
     LMLog(@"Transition %@ played | bundleID: %@ | snapshot: %@",
           opening ? @"OPEN" : @"CLOSE", bundleID ?: @"?", snapshot ? @"yes" : @"no");
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((anim.duration + 0.1) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((anim.duration + 0.05) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         if (gCurrentState == state) {
+            [backdrop removeFromSuperlayer];
             [maskShape removeFromSuperlayer];
             [contentLayer removeFromSuperlayer];
             gCurrentState = nil;
@@ -266,12 +284,25 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
 - (void)_handleTap {
     @try {
         id icon = [self valueForKey:@"icon"];
+        NSString *className = NSStringFromClass([icon class]);
+
+        // Bo qua folder / thu vien ung dung - chi ap dung cho app that.
+        BOOL isFolderLike = [className.lowercaseString containsString:@"folder"] ||
+                             [className.lowercaseString containsString:@"library"] ||
+                             [className.lowercaseString containsString:@"cluster"];
+
+        if (isFolderLike) {
+            LMLog(@"_handleTap fired NHUNG la folder/library (class: %@) - bo qua hieu ung", className);
+            %orig;
+            return;
+        }
+
         NSString *bundleID = @"";
         if (icon && [icon respondsToSelector:@selector(bundleIdentifier)]) {
             bundleID = [icon performSelector:@selector(bundleIdentifier)] ?: @"";
         }
         CGRect frameInWindow = [self.window convertRect:self.bounds fromView:self];
-        LMLog(@"_handleTap fired | bundleID: %@ | frame: %@", bundleID, NSStringFromCGRect(frameInWindow));
+        LMLog(@"_handleTap fired | class: %@ | bundleID: %@ | frame: %@", className, bundleID, NSStringFromCGRect(frameInWindow));
         LMPlayTransition(frameInWindow, bundleID, YES);
     } @catch (NSException *e) {
         LMLog(@"Exception in _handleTap: %@", e.reason);
@@ -281,14 +312,8 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
 
 %end
 
-// GOM CHUNG 1 khai bao duy nhat (tranh loi truoc do khai bao trung khien
-// mot phan hook bi bo qua am tham).
 @interface SBIconController : NSObject
 - (void)handleHomeButtonTap;
-- (void)_launchFromIconView:(id)iconView withActions:(id)actions;
-- (id)launchActionsForIconView:(id)iconView;
-- (void)iconManager:(id)manager launchIconForIconView:(id)iconView withActions:(id)actions;
-- (void)iconManager:(id)manager willPrepareIconViewForLaunch:(id)iconView;
 @end
 
 %hook SBIconController
@@ -307,31 +332,10 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
     %orig;
 }
 
-// Boc loi goi goc trong 1 CATransaction thoi luong = 0, ep bat ky animation
-// he thong tao ra trong luc nay bi nen ve tuc thoi (khong nhin thay duoc),
-// de hieu ung cua minh la thu DUY NHAT co chuyen dong.
-- (void)_launchFromIconView:(id)iconView withActions:(id)actions {
-    LMLog(@"_launchFromIconView:withActions: - boc CATransaction 0 duration");
-    [CATransaction begin];
-    [CATransaction setDisableActions:YES];
-    [CATransaction setAnimationDuration:0];
-    %orig;
-    [CATransaction commit];
-}
-
-- (void)iconManager:(id)manager launchIconForIconView:(id)iconView withActions:(id)actions {
-    LMLog(@"iconManager:launchIconForIconView:withActions: - boc CATransaction 0 duration");
-    [CATransaction begin];
-    [CATransaction setDisableActions:YES];
-    [CATransaction setAnimationDuration:0];
-    %orig;
-    [CATransaction commit];
-}
-
 %end
 
 %ctor {
-    LMLog(@"=== LiquidMorph REAL v5 loaded | process: %@ | iOS %@ ===",
+    LMLog(@"=== LiquidMorph REAL v6 loaded | process: %@ | iOS %@ ===",
           [[NSProcessInfo processInfo] processName],
           [[UIDevice currentDevice] systemVersion]);
 }
