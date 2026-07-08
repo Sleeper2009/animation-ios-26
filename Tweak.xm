@@ -67,6 +67,22 @@ static CGFloat LMEdgeProgress(CGFloat t, CGFloat closeness, CGFloat maxDelay) {
     return edgeT;
 }
 
+// Bo goc hinh "phong": bat dau nhu icon that (~13), phong len cao nhat (120)
+// giua chung, roi ha xuong 20 luc gan cuoi. KHONG con la duong giam thang.
+static CGFloat LMHumpRadius(CGFloat t) {
+    CGFloat iconRadius = 13.0;
+    CGFloat peakRadius = 120.0;
+    CGFloat endRadius = 20.0;
+    if (t < 0.45) {
+        CGFloat local = t / 0.45;
+        return iconRadius + (peakRadius - iconRadius) * local;
+    } else {
+        CGFloat local = (t - 0.45) / 0.55;
+        if (local > 1) local = 1;
+        return peakRadius + (endRadius - peakRadius) * local;
+    }
+}
+
 static UIImage *LMLoadAppSnapshot(NSString *bundleID) {
     if (bundleID.length == 0) return nil;
     NSString *dir = [NSString stringWithFormat:@"/var/mobile/Library/Caches/Snapshots/%@", bundleID];
@@ -109,9 +125,8 @@ static NSArray *LMBuildKeyframePaths(CGRect iconFrame, CGRect screen, BOOL openi
 
     NSInteger steps = 24;
     NSMutableArray *paths = [NSMutableArray array];
-    CGFloat startRadius = 120.0;
-    CGFloat endRadius = 20.0;
     CGFloat maxDelay = 0.4;
+    CGFloat endRadius = 20.0;
 
     CGFloat bounceDirection = (iconCenterYNorm > 0.5) ? -1.0 : 1.0;
     CGFloat bounceAmount = 42.0;
@@ -149,10 +164,12 @@ static NSArray *LMBuildKeyframePaths(CGRect iconFrame, CGRect screen, BOOL openi
         CGPoint br = CGPointMake(bottomRightX, bottomY);
         CGPoint bl = CGPointMake(bottomLeftX, bottomY);
 
-        CGFloat rTL = startRadius * (1.0 - MIN(topP, leftP)) + endRadius * MIN(topP, leftP);
-        CGFloat rTR = startRadius * (1.0 - MIN(topP, rightP)) + endRadius * MIN(topP, rightP);
-        CGFloat rBR = startRadius * (1.0 - MIN(bottomP, rightP)) + endRadius * MIN(bottomP, rightP);
-        CGFloat rBL = startRadius * (1.0 - MIN(bottomP, leftP)) + endRadius * MIN(bottomP, leftP);
+        CGFloat humpBase = LMHumpRadius(t);
+
+        CGFloat rTL = humpBase * (1.0 - MIN(topP, leftP)) + endRadius * MIN(topP, leftP);
+        CGFloat rTR = humpBase * (1.0 - MIN(topP, rightP)) + endRadius * MIN(topP, rightP);
+        CGFloat rBR = humpBase * (1.0 - MIN(bottomP, rightP)) + endRadius * MIN(bottomP, rightP);
+        CGFloat rBL = humpBase * (1.0 - MIN(bottomP, leftP)) + endRadius * MIN(bottomP, leftP);
 
         CGPathRef p = LMRoundedQuadPath(tl, tr, br, bl, rTL, rTR, rBR, rBL);
         [paths addObject:(__bridge_transfer id)p];
@@ -264,7 +281,8 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
 
 %end
 
-// Do them 4 candidate khac de tim dung cho tat animation goc
+// GOM CHUNG 1 khai bao duy nhat (tranh loi truoc do khai bao trung khien
+// mot phan hook bi bo qua am tham).
 @interface SBIconController : NSObject
 - (void)handleHomeButtonTap;
 - (void)_launchFromIconView:(id)iconView withActions:(id)actions;
@@ -277,13 +295,11 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
 
 - (void)handleHomeButtonTap {
     @try {
+        LMLog(@"handleHomeButtonTap fired | hasActiveState: %d", gCurrentState != nil);
         if (gCurrentState && gCurrentState.isOpening) {
             CGRect iconFrame = gCurrentState.iconFrame;
             NSString *bundleID = gCurrentState.bundleID;
-            LMLog(@"handleHomeButtonTap fired -> play CLOSE | frame: %@", NSStringFromCGRect(iconFrame));
             LMPlayTransition(iconFrame, bundleID, NO);
-        } else {
-            LMLog(@"handleHomeButtonTap fired but no active open-state - bo qua");
         }
     } @catch (NSException *e) {
         LMLog(@"Exception in handleHomeButtonTap: %@", e.reason);
@@ -291,30 +307,31 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
     %orig;
 }
 
+// Boc loi goi goc trong 1 CATransaction thoi luong = 0, ep bat ky animation
+// he thong tao ra trong luc nay bi nen ve tuc thoi (khong nhin thay duoc),
+// de hieu ung cua minh la thu DUY NHAT co chuyen dong.
 - (void)_launchFromIconView:(id)iconView withActions:(id)actions {
-    LMLog(@"[dump-launch] _launchFromIconView:withActions: fired");
+    LMLog(@"_launchFromIconView:withActions: - boc CATransaction 0 duration");
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    [CATransaction setAnimationDuration:0];
     %orig;
-}
-
-- (id)launchActionsForIconView:(id)iconView {
-    LMLog(@"[dump-launch] launchActionsForIconView: fired");
-    return %orig;
+    [CATransaction commit];
 }
 
 - (void)iconManager:(id)manager launchIconForIconView:(id)iconView withActions:(id)actions {
-    LMLog(@"[dump-launch] iconManager:launchIconForIconView:withActions: fired");
+    LMLog(@"iconManager:launchIconForIconView:withActions: - boc CATransaction 0 duration");
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    [CATransaction setAnimationDuration:0];
     %orig;
-}
-
-- (void)iconManager:(id)manager willPrepareIconViewForLaunch:(id)iconView {
-    LMLog(@"[dump-launch] iconManager:willPrepareIconViewForLaunch: fired");
-    %orig;
+    [CATransaction commit];
 }
 
 %end
 
 %ctor {
-    LMLog(@"=== LiquidMorph REAL v4 (dump-launch) loaded | process: %@ | iOS %@ ===",
+    LMLog(@"=== LiquidMorph REAL v5 loaded | process: %@ | iOS %@ ===",
           [[NSProcessInfo processInfo] processName],
           [[UIDevice currentDevice] systemVersion]);
 }
