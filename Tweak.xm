@@ -101,7 +101,6 @@ static void LMPlayMorphOverlay(CGRect iconFrame) {
     CGFloat iconCenterXNorm = (iconFrame.origin.x + iconFrame.size.width / 2.0) / screen.size.width;
     CGFloat iconCenterYNorm = (iconFrame.origin.y + iconFrame.size.height / 2.0) / screen.size.height;
 
-    // closeness: 1 = sat canh do, 0 = sat canh doi dien
     CGFloat closeBottom = iconCenterYNorm;
     CGFloat closeTop = 1.0 - iconCenterYNorm;
     CGFloat closeRight = iconCenterXNorm;
@@ -132,19 +131,14 @@ static void LMPlayMorphOverlay(CGRect iconFrame) {
     for (NSInteger i = 0; i <= steps; i++) {
         CGFloat t = (CGFloat)i / (CGFloat)steps;
 
-        // Tien do rieng cho tung canh (tren/duoi/trai/phai)
         CGFloat topP = LMEdgeProgress(t, closeTop, maxDelay);
         CGFloat bottomP = LMEdgeProgress(t, closeBottom, maxDelay);
         CGFloat leftP = LMEdgeProgress(t, closeLeft, maxDelay);
         CGFloat rightP = LMEdgeProgress(t, closeRight, maxDelay);
 
-        // Y cua canh tren/duoi phu thuoc DUNG tien do cua canh do
         CGFloat topY = iconTop + (screenTop - iconTop) * topP;
         CGFloat bottomY = iconBottom + (screenBottom - iconBottom) * bottomP;
 
-        // QUAN TRONG: X cua moi goc phu thuoc CA tien do canh ngang (tren/duoi)
-        // LAN tien do canh doc (trai/phai) - day la thu tao ra hinh thang that,
-        // khac voi ban truoc dung chung 1 leftX/rightX cho ca 2 canh.
         CGFloat topLeftX = iconLeft + (screenLeft - iconLeft) * ((topP + leftP) * 0.5);
         CGFloat topRightX = iconRight + (screenRight - iconRight) * ((topP + rightP) * 0.5);
         CGFloat bottomLeftX = iconLeft + (screenLeft - iconLeft) * ((bottomP + leftP) * 0.5);
@@ -166,7 +160,7 @@ static void LMPlayMorphOverlay(CGRect iconFrame) {
 
     CAKeyframeAnimation *anim = [CAKeyframeAnimation animationWithKeyPath:@"path"];
     anim.values = paths;
-    anim.duration = 2.0;
+    anim.duration = 0.5;
     anim.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
     anim.fillMode = kCAFillModeForwards;
     anim.removedOnCompletion = NO;
@@ -176,7 +170,7 @@ static void LMPlayMorphOverlay(CGRect iconFrame) {
 
     LMLog(@"Morph v3 played | iconCenterNorm: (%.2f, %.2f)", iconCenterXNorm, iconCenterYNorm);
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [shape removeFromSuperlayer];
     });
 }
