@@ -25,8 +25,6 @@ static void LMLog(NSString *format, ...) {
     NSLog(@"[LiquidMorph] %@", message);
 }
 
-// Liet ke method chua tu khoa "bundle" cua 1 object bat ky - dung de do
-// dung ten property lay bundleID tren chinh may ban, chi chay 1 LAN.
 static void LMDumpBundleMethods(id obj) {
     if (!obj) return;
     Class cls = [obj class];
@@ -133,7 +131,7 @@ static NSArray *LMBuildKeyframePaths(CGRect iconFrame, CGRect screen, BOOL openi
     CGFloat maxDelay = 0.4;
 
     CGFloat bounceDirection = (iconCenterYNorm > 0.5) ? -1.0 : 1.0;
-    CGFloat bounceAmount = 42.0; // tang gap 3 lan (14 -> 42)
+    CGFloat bounceAmount = 42.0;
 
     CGFloat iconLeft = iconFrame.origin.x;
     CGFloat iconRight = iconFrame.origin.x + iconFrame.size.width;
@@ -278,18 +276,21 @@ static BOOL gDidDumpBundle = NO;
         }
 
         NSString *bundleID = @"";
-        // Thu vai ten thuong gap, neu khong co thi bo qua (log dump o tren se cho biet ten dung)
         SEL candidates[] = {
             @selector(bundleIdentifier),
             NSSelectorFromString(@"applicationBundleID"),
             NSSelectorFromString(@"leafIdentifier")
         };
+
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
         for (int i = 0; i < 3; i++) {
             if (icon && [icon respondsToSelector:candidates[i]]) {
                 bundleID = [icon performSelector:candidates[i]] ?: @"";
                 if (bundleID.length > 0) break;
             }
         }
+        #pragma clang diagnostic pop
 
         gLastBundleID = bundleID;
         CGRect frameInWindow = [self.window convertRect:self.bounds fromView:self];
