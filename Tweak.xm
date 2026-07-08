@@ -2,9 +2,6 @@
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 
-// =====================================================================
-// LOG
-// =====================================================================
 static NSString *const kLogPath = @"/var/mobile/Documents/LiquidMorph.log";
 
 static void LMLog(NSString *format, ...) {
@@ -28,9 +25,25 @@ static void LMLog(NSString *format, ...) {
     NSLog(@"[LiquidMorph] %@", message);
 }
 
-// =====================================================================
-// PATH: hinh thang bo goc doc lap tung dinh
-// =====================================================================
+// Liet ke method chua tu khoa "bundle" cua 1 object bat ky - dung de do
+// dung ten property lay bundleID tren chinh may ban, chi chay 1 LAN.
+static void LMDumpBundleMethods(id obj) {
+    if (!obj) return;
+    Class cls = [obj class];
+    unsigned int count = 0;
+    Method *methods = class_copyMethodList(cls, &count);
+    LMLog(@"[dump-bundle] class: %@ (%u methods)", NSStringFromClass(cls), count);
+    for (unsigned int i = 0; i < count; i++) {
+        SEL sel = method_getName(methods[i]);
+        NSString *name = NSStringFromSelector(sel);
+        if ([name.lowercaseString containsString:@"bundle"] ||
+            [name.lowercaseString containsString:@"identifier"]) {
+            LMLog(@"[dump-bundle] -> %@", name);
+        }
+    }
+    free(methods);
+}
+
 static CGPathRef LMRoundedQuadPath(CGPoint tl, CGPoint tr, CGPoint br, CGPoint bl,
                                     CGFloat rTL, CGFloat rTR, CGFloat rBR, CGFloat rBL) {
     NSArray *points = @[[NSValue valueWithCGPoint:tl], [NSValue valueWithCGPoint:tr],
@@ -91,9 +104,6 @@ static UIImage *LMLoadAppSnapshot(NSString *bundleID) {
     return nil;
 }
 
-// =====================================================================
-// STATE
-// =====================================================================
 @interface LMTransitionState : NSObject
 @property (nonatomic, strong) CAShapeLayer *maskShape;
 @property (nonatomic, strong) CALayer *contentLayer;
@@ -123,7 +133,7 @@ static NSArray *LMBuildKeyframePaths(CGRect iconFrame, CGRect screen, BOOL openi
     CGFloat maxDelay = 0.4;
 
     CGFloat bounceDirection = (iconCenterYNorm > 0.5) ? -1.0 : 1.0;
-    CGFloat bounceAmount = 14.0;
+    CGFloat bounceAmount = 42.0; // tang gap 3 lan (14 -> 42)
 
     CGFloat iconLeft = iconFrame.origin.x;
     CGFloat iconRight = iconFrame.origin.x + iconFrame.size.width;
@@ -249,28 +259,38 @@ static void LMPlayTransition(CGRect iconFrame, NSString *bundleID, BOOL opening)
     });
 }
 
-// =====================================================================
-// HOOKS
-// =====================================================================
 @interface SBIconView : UIView
 - (id)icon;
 @end
-@interface SBIcon : NSObject
-- (NSString *)displayName;
-- (NSString *)bundleIdentifier;
-@end
 
 static NSString *gLastBundleID = @"";
+static BOOL gDidDumpBundle = NO;
 
 %hook SBIconView
 
 - (void)_handleTap {
     @try {
         id icon = [self valueForKey:@"icon"];
-        NSString *bundleID = @"";
-        if (icon && [icon respondsToSelector:@selector(bundleIdentifier)]) {
-            bundleID = [icon performSelector:@selector(bundleIdentifier)] ?: @"";
+
+        if (!gDidDumpBundle) {
+            LMDumpBundleMethods(icon);
+            gDidDumpBundle = YES;
         }
+
+        NSString *bundleID = @"";
+        // Thu vai ten thuong gap, neu khong co thi bo qua (log dump o tren se cho biet ten dung)
+        SEL candidates[] = {
+            @selector(bundleIdentifier),
+            NSSelectorFromString(@"applicationBundleID"),
+            NSSelectorFromString(@"leafIdentifier")
+        };
+        for (int i = 0; i < 3; i++) {
+            if (icon && [icon respondsToSelector:candidates[i]]) {
+                bundleID = [icon performSelector:candidates[i]] ?: @"";
+                if (bundleID.length > 0) break;
+            }
+        }
+
         gLastBundleID = bundleID;
         CGRect frameInWindow = [self.window convertRect:self.bounds fromView:self];
         LMLog(@"_handleTap fired | bundleID: %@ | frame: %@", bundleID, NSStringFromCGRect(frameInWindow));
@@ -283,44 +303,32 @@ static NSString *gLastBundleID = @"";
 
 %end
 
-// Tat animation goc cua he thong: ep tham so animated: ve NO de hieu ung
-// cua minh la thu DUY NHAT hien thi, khong con animation mac dinh chay song song.
 @interface SBIconController : NSObject
-- (void)iconManager:(id)manager launchIcon:(id)icon location:(CGPoint)location animated:(BOOL)animated completionHandler:(id)handler;
+- (void)handleHomeButtonTap;
 @end
 
 %hook SBIconController
 
-- (void)iconManager:(id)manager launchIcon:(id)icon location:(CGPoint)location animated:(BOOL)animated completionHandler:(id)handler {
-    LMLog(@"iconManager:launchIcon fired - tat animation goc (animated: NO)");
-    %orig(manager, icon, location, NO, handler);
+- (void)handleHomeButtonTap {
+    @try {
+        if (gCurrentState && gCurrentState.isOpening) {
+            CGRect iconFrame = gCurrentState.iconFrame;
+            NSString *bundleID = gCurrentState.bundleID;
+            LMLog(@"handleHomeButtonTap fired -> play CLOSE | frame: %@", NSStringFromCGRect(iconFrame));
+            LMPlayTransition(iconFrame, bundleID, NO);
+        } else {
+            LMLog(@"handleHomeButtonTap fired but no active open-state - bo qua");
+        }
+    } @catch (NSException *e) {
+        LMLog(@"Exception in handleHomeButtonTap: %@", e.reason);
+    }
+    %orig;
 }
 
 %end
 
 %ctor {
-    LMLog(@"=== LiquidMorph REAL v2 loaded | process: %@ | iOS %@ ===",
+    LMLog(@"=== LiquidMorph REAL v3 loaded | process: %@ | iOS %@ ===",
           [[NSProcessInfo processInfo] processName],
           [[UIDevice currentDevice] systemVersion]);
-
-    // Bat su kien dong app KHONG phu thuoc cach dong (nut Home that,
-    // vuot cu chi, hay Little12/GestureX gia cu chi) - vi du nao cung
-    // ket thuc bang viec SpringBoard tro thanh active tro lai.
-    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
-                                                        object:nil
-                                                         queue:nil
-                                                    usingBlock:^(NSNotification *note) {
-        @try {
-            if (gCurrentState && gCurrentState.isOpening) {
-                // Chi phat hieu ung dong neu truoc do co 1 lan mo thanh cong
-                // (tranh chay hieu ung dong ngay khi SpringBoard vua khoi dong).
-                CGRect lastFrame = gCurrentState.iconFrame;
-                NSString *lastBundle = gCurrentState.bundleID;
-                LMLog(@"SpringBoard became active -> play CLOSE | lastFrame: %@", NSStringFromCGRect(lastFrame));
-                LMPlayTransition(lastFrame, lastBundle, NO);
-            }
-        } @catch (NSException *e) {
-            LMLog(@"Exception in DidBecomeActive handler: %@", e.reason);
-        }
-    }];
 }
