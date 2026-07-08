@@ -71,7 +71,6 @@ static CGPathRef LMRoundedQuadPath(CGPoint tl, CGPoint tr, CGPoint br, CGPoint b
 }
 
 static CGFloat LMEdgeProgress(CGFloat t, CGFloat closeness, CGFloat maxDelay) {
-    // closeness: 1 = canh gan icon (cham), 0 = canh xa icon (nhanh)
     CGFloat delay = closeness * maxDelay;
     CGFloat span = 1.0 - delay;
     if (span <= 0) span = 0.001;
@@ -94,8 +93,7 @@ static void LMPlayMorphOverlay(CGRect iconFrame) {
     CGFloat iconCenterXNorm = (iconFrame.origin.x + iconFrame.size.width / 2.0) / screen.size.width;
     CGFloat iconCenterYNorm = (iconFrame.origin.y + iconFrame.size.height / 2.0) / screen.size.height;
 
-    // "gan canh nao" - 1 = sat canh do, 0 = sat canh doi dien
-    CGFloat closeBottom = iconCenterYNorm;        // icon cang o duoi -> canh duoi cang "gan"
+    CGFloat closeBottom = iconCenterYNorm;
     CGFloat closeTop = 1.0 - iconCenterYNorm;
     CGFloat closeRight = iconCenterXNorm;
     CGFloat closeLeft = 1.0 - iconCenterXNorm;
@@ -138,8 +136,7 @@ static void LMPlayMorphOverlay(CGRect iconFrame) {
         CGFloat rBL = startRadius * (1.0 - MIN(tBottom, tLeft));
 
         CGPathRef p = LMRoundedQuadPath(tl, tr, br, bl, rTL, rTR, rBR, rBL);
-        [paths addObject:(__bridge id)p];
-        CGPathRelease(p);
+        [paths addObject:(__bridge_transfer id)p];
     }
 
     CAKeyframeAnimation *anim = [CAKeyframeAnimation animationWithKeyPath:@"path"];
