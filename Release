@@ -1,0 +1,8 @@
+Origin: Fujb Repo
+Label: Fujb
+Suite: Fujb2009
+Version: 1.0.0
+Codename: ios
+Architectures: iphoneos-arm iphoneos-arm64
+Components: main
+Description: Cac thu thuat Jailbreak cho iPhone 
