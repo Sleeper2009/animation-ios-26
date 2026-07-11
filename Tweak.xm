@@ -2,7 +2,7 @@
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 
-static NSString *const kLogPath = @"/var/mobile/Documents/LiquidMorph_backboardd.log";
+static NSString *const kLogPath = @"/var/mobile/Documents/LiquidMorph.log";
 
 static void LMLog(NSString *format, ...) {
     va_list args;
