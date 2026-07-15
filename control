@@ -6,4 +6,5 @@ Description: Test tweak - log icon tap
 Maintainer: Furina
 Author: Furina
 Section: Tweaks
-Depends: mobilesubstrate, PreferenceLoader
+Depends: mobilesubstrate
+Suggests: PreferenceLoader
