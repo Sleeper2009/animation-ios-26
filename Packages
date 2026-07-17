@@ -15,5 +15,5 @@ Architecture: iphoneos-arm64
 Maintainer: 
 Filename: ./LiquidSiri-1.1.0-rootless.deb
 Section: Tweaks
-Size: 939008
+Size: 939022
 Description: Giao diện Siri ios 27
