@@ -5,14 +5,17 @@
         cell = PSLinkCell;
     };
     items = (
-        { cell = PSGroupCell; label = "LiquidMorph"; footerText = "Chinh sua hieu ung morph khi mo/dong ung dung."; },
-        { cell = PSSwitchCell; label = "Bat hieu ung"; key = "enabled"; defaults = "com.furina.liquidmorph"; default = 1; PostNotification = "com.furina.liquidmorph/settingschanged"; },
-        { cell = PSGroupCell; label = "Do nay (Bounce)"; },
-        { cell = PSSliderCell; label = "Do nay"; key = "bounceAmount"; defaults = "com.furina.liquidmorph"; default = 42; min = 0; max = 100; PostNotification = "com.furina.liquidmorph/settingschanged"; },
-        { cell = PSGroupCell; label = "Bo goc"; },
-        { cell = PSSliderCell; label = "Bo goc cao nhat"; key = "peakRadius"; defaults = "com.furina.liquidmorph"; default = 120; min = 20; max = 200; PostNotification = "com.furina.liquidmorph/settingschanged"; },
-        { cell = PSSliderCell; label = "Bo goc luc ket thuc"; key = "endRadius"; defaults = "com.furina.liquidmorph"; default = 20; min = 0; max = 60; PostNotification = "com.furina.liquidmorph/settingschanged"; },
-        { cell = PSGroupCell; label = "Toc do"; },
-        { cell = PSSliderCell; label = "Thoi luong (giay)"; key = "duration"; defaults = "com.furina.liquidmorph"; default = 0.45; min = 0.15; max = 1.0; PostNotification = "com.furina.liquidmorph/settingschanged"; }
+        { cell = PSGroupCell; label = "LiquidMorph"; footerText = "Chỉnh sửa hiệu ứng morph khi mở/đóng ứng dụng. Thay đổi áp dụng ngay."; },
+        { cell = PSSwitchCell; label = "Bật hiệu ứng"; key = "enabled"; defaults = "com.furina.liquidmorph"; default = 1; PostNotification = "com.furina.liquidmorph/settingschanged"; },
+        { cell = PSGroupCell; label = "Độ nảy"; },
+        { cell = PSSliderCell; label = "Độ nảy"; key = "bounceAmount"; defaults = "com.furina.liquidmorph"; default = 42; min = 0; max = 100; PostNotification = "com.furina.liquidmorph/settingschanged"; },
+        { cell = PSGroupCell; label = "Bo góc"; },
+        { cell = PSSliderCell; label = "Bo góc cao nhất"; key = "peakRadius"; defaults = "com.furina.liquidmorph"; default = 120; min = 20; max = 200; PostNotification = "com.furina.liquidmorph/settingschanged"; },
+        { cell = PSSliderCell; label = "Bo góc lúc kết thúc"; key = "endRadius"; defaults = "com.furina.liquidmorph"; default = 20; min = 0; max = 60; PostNotification = "com.furina.liquidmorph/settingschanged"; },
+        { cell = PSGroupCell; label = "Tốc độ"; },
+        { cell = PSSliderCell; label = "Thời lượng (giây)"; key = "duration"; defaults = "com.furina.liquidmorph"; default = 0.45; min = 0.15; max = 1.0; PostNotification = "com.furina.liquidmorph/settingschanged"; },
+        { cell = PSGroupCell; label = " "; },
+        { cell = PSButtonCell; label = "Đặt lại mặc định"; PostNotification = "com.furina.liquidmorph/reset"; },
+        { cell = PSButtonCell; label = "Khởi động lại SpringBoard"; PostNotification = "com.furina.liquidmorph/respring"; }
     );
 }
